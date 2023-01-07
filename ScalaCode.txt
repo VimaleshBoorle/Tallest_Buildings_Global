@@ -1,0 +1,51 @@
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions._
+object test {
+  def main(args: Array[String]): Unit = {
+    val spark = SparkSession.builder()
+      .master("local[2]")
+      .appName("order")
+      .getOrCreate()
+
+    val cust_df = spark.read
+      .option("Header", true)
+      .option("inferschema", true)
+      .csv("input/tallest_buildings_global.csv")
+
+    val top10_buildings = cust_df.select("name","height_m").limit(10)
+    val countrywise_count=cust_df.groupBy("country").count().orderBy(desc("count"))
+    cust_df.createTempView("cust")
+    val buildings_age = spark.sql("select name,ABS(year_built-2022) as age from cust").sort(desc("age")).limit(10)
+    val countrywise_avgfloors = cust_df.groupBy("country","city").agg(avg("floors_above").as("average_floors")).sort(desc("average_floors"))
+    val yearwise_count = cust_df.groupBy("year_built").count().orderBy(desc("count"))
+    val skyscapers_country = spark.sql("select country,count(city) as number from cust where height_m > 400 group by country").sort(desc("number"))
+    val china_nofloors_below = spark.sql("select name,city from cust where floors_below_ground is null and country = 'China'")
+    val top10_floorwise_highest = cust_df.select("name","floors_above").sort(desc("floors_above")).limit(10)
+    val top5_usa = cust_df.select("name","height_m").where(cust_df("country") === "United States").sort(desc("height_m"))
+    val highest_TradeCenter = cust_df.select("name","height_m","country").filter(col("name").contains("Trade Center"))
+
+//saving df in csv files
+
+    top10_buildings.coalesce(1).write.format("csv").mode("overwrite").option("Header",true).option("delimiter",",")
+      .csv("Output/ top10_buildings")
+    buildings_age.coalesce(1).write.format("csv").mode("overwrite").option("Header",true).option("delimiter",",")
+      .csv("Output/ buildings_age")
+    countrywise_count.coalesce(1).write.format("csv").mode("overwrite").option("Header",true).option("delimiter",",")
+      .csv("Output/countrywise_count")
+    countrywise_avgfloors.coalesce(1).write.format("csv").mode("overwrite").option("Header",true).option("delimiter",",")
+      .csv("Output/ countrywise_avgfloors")
+    yearwise_count.coalesce(1).write.format("csv").mode("overwrite").option("Header",true).option("delimiter",",")
+      .csv("Output/ yearwise_count")
+    skyscapers_country.coalesce(1).write.format("csv").mode("overwrite").option("Header",true).option("delimiter",",")
+      .csv("Output/ skyscapers_country")
+    china_nofloors_below.coalesce(1).write.format("csv").mode("overwrite").option("Header",true).option("delimiter",",")
+          .csv("Output/ china_nofloors_below")
+    top10_floorwise_highest.coalesce(1).write.format("csv").mode("overwrite").option("Header",true).option("delimiter",",")
+              .csv("Output/ top10_floorwise_highest")
+     top5_usa.coalesce(1).write.format("csv").mode("overwrite").option("Header",true).option("delimiter",",")
+             .csv("Output/ top5_usa")
+    highest_TradeCenter.coalesce(1).write.format("csv").mode("overwrite").option("Header",true).option("delimiter",",")
+        .csv("Output/ highest_TradeCenter")
+
+  }
+}
